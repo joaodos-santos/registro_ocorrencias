@@ -165,6 +165,20 @@ class RelatorioTVTOpPDF(FPDF):
 # ==========================================
 st.set_page_config(page_title="Registro Técnico", layout="wide")
 
+# Função para atualizar horários baseados na fase selecionada
+def atualizar_horarios_tec():
+    if "Fase 1" in st.session_state["fase_tec"]:
+        st.session_state["hr_in_tec"] = datetime.time(13, 0)
+        st.session_state["hr_out_tec"] = datetime.time(19, 0)
+    else:
+        st.session_state["hr_in_tec"] = datetime.time(23, 0)
+        st.session_state["hr_out_tec"] = datetime.time(6, 0)
+
+# Inicialização padrão para a primeira vez que a página carrega
+if "hr_in_tec" not in st.session_state:
+    st.session_state["hr_in_tec"] = datetime.time(13, 0)
+    st.session_state["hr_out_tec"] = datetime.time(19, 0)
+
 st.title("🔧 TVTOP PBCS - Registro Técnico")
 
 # --- SEÇÃO 1: Identificação ---
@@ -172,9 +186,9 @@ st.markdown("### 1. IDENTIFICAÇÃO DO TURNO E DA JANELA DE TESTE")
 with st.container(border=True):
     col_data, col_fase, col_hin, col_hout = st.columns(4)
     data_relatorio = col_data.date_input("Data do Relatório", datetime.date.today(), key="data_tec")
-    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="fase_tec")
-    hr_inicio = col_hin.time_input("Início (UTC)", datetime.time(13, 0), key="hr_in_tec")
-    hr_fim = col_hout.time_input("Término (UTC)", datetime.time(19, 0), key="hr_out_tec")
+    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="fase_tec", on_change=atualizar_horarios_tec)
+    hr_inicio = col_hin.time_input("Início (UTC)", key="hr_in_tec")
+    hr_fim = col_hout.time_input("Término (UTC)", key="hr_out_tec")
     
     st.markdown("##### Equipe de Serviço")
     c_tiop, c_acc = st.columns(2)

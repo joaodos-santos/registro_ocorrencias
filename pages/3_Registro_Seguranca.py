@@ -17,9 +17,9 @@ class RelatorioSegurancaPDF(FPDF):
     def header(self):
         self.set_font("helvetica", "B", 10)
         self.set_text_color(0, 51, 102)
-        self.cell(0, 5, "CINDACTA III - SUBGRUPO DE SEGURANÇA OPERACIONAL", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 5, "CINDACTA III - CÉLULA DE SEGURANÇA OPERACIONAL", align="C", new_x="LMARGIN", new_y="NEXT")
         self.set_font("helvetica", "B", 12)
-        self.cell(0, 6, "RELATÓRIO DIÁRIO DE OCORRÊNCIAS DE SEGURANÇA OPERACIONAL - TVTOP PBCS", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 6, "RELATÓRIO DIÁRIO DE OCORRÊNCIAS DE SEGURANÇA - TVTOP PBCS", align="C", new_x="LMARGIN", new_y="NEXT")
         self.set_draw_color(0, 51, 102)
         self.set_line_width(0.5)
         self.line(10, self.get_y() + 2, 200, self.get_y() + 2)
@@ -162,6 +162,20 @@ class RelatorioSegurancaPDF(FPDF):
 # ==========================================
 st.set_page_config(page_title="Registro de Segurança", layout="wide")
 
+# Função para atualizar horários baseados na fase selecionada
+def atualizar_horarios_seg():
+    if "Fase 1" in st.session_state["fase_seg"]:
+        st.session_state["hr_in_seg"] = datetime.time(13, 0)
+        st.session_state["hr_out_seg"] = datetime.time(19, 0)
+    else:
+        st.session_state["hr_in_seg"] = datetime.time(23, 0)
+        st.session_state["hr_out_seg"] = datetime.time(6, 0)
+
+# Inicialização padrão para a primeira vez que a página carrega
+if "hr_in_seg" not in st.session_state:
+    st.session_state["hr_in_seg"] = datetime.time(13, 0)
+    st.session_state["hr_out_seg"] = datetime.time(19, 0)
+
 st.title("🛡️ TVTOP PBCS - Registro de Segurança")
 
 # --- SEÇÃO 1: Identificação ---
@@ -169,9 +183,9 @@ st.markdown("### 1. IDENTIFICAÇÃO DO TURNO E DA JANELA DE TESTE")
 with st.container(border=True):
     col_data, col_fase, col_hin, col_hout = st.columns(4)
     data_relatorio = col_data.date_input("Data do Relatório", datetime.date.today(), key="data_seg")
-    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="fase_seg")
-    hr_inicio = col_hin.time_input("Início (UTC)", datetime.time(13, 0), key="hr_in_seg")
-    hr_fim = col_hout.time_input("Término (UTC)", datetime.time(19, 0), key="hr_out_seg")
+    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="fase_seg", on_change=atualizar_horarios_seg)
+    hr_inicio = col_hin.time_input("Início (UTC)", key="hr_in_seg")
+    hr_fim = col_hout.time_input("Término (UTC)", key="hr_out_seg")
     
     st.markdown("##### Equipe de Serviço")
     c_tiop, c_acc = st.columns(2)
@@ -290,6 +304,7 @@ with st.container(border=True):
         key="data_ant_seg"
     )
     texto_acompanhamento = st.text_area("Acompanhamento / Solução", key="texto_ant_seg")
+
 
 # --- SEÇÃO 5: Outras Ocorrências ---
 st.markdown("### 5. OUTRAS OCORRÊNCIAS / OBSERVAÇÕES GERAIS")

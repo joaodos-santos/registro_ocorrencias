@@ -163,6 +163,20 @@ class RelatorioOperacionalPDF(FPDF):
 # ==========================================
 st.set_page_config(page_title="Registro Operacional", layout="wide")
 
+# Função para atualizar horários baseados na fase selecionada
+def atualizar_horarios_op():
+    if "Fase 1" in st.session_state["fase_op"]:
+        st.session_state["hr_in_op"] = datetime.time(13, 0)
+        st.session_state["hr_out_op"] = datetime.time(19, 0)
+    else:
+        st.session_state["hr_in_op"] = datetime.time(23, 0)
+        st.session_state["hr_out_op"] = datetime.time(6, 0)
+
+# Inicialização padrão para a primeira vez que a página carrega
+if "hr_in_op" not in st.session_state:
+    st.session_state["hr_in_op"] = datetime.time(13, 0)
+    st.session_state["hr_out_op"] = datetime.time(19, 0)
+
 st.title("📡 TVTOP PBCS - Registro Operacional")
 
 # --- SEÇÃO 1: Identificação ---
@@ -170,9 +184,9 @@ st.markdown("### 1. IDENTIFICAÇÃO DO TURNO E DA JANELA DE TESTE")
 with st.container(border=True):
     col_data, col_fase, col_hin, col_hout = st.columns(4)
     data_relatorio = col_data.date_input("Data do Relatório", datetime.date.today(), key="data_op")
-    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="fase_op")
-    hr_inicio = col_hin.time_input("Início (UTC)", datetime.time(13, 0), key="hr_in_op")
-    hr_fim = col_hout.time_input("Término (UTC)", datetime.time(19, 0), key="hr_out_op")
+    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="fase_op", on_change=atualizar_horarios_op)
+    hr_inicio = col_hin.time_input("Início (UTC)", key="hr_in_op")
+    hr_fim = col_hout.time_input("Término (UTC)", key="hr_out_op")
     
     st.markdown("##### Equipe de Serviço")
     c_acc, c_tiop = st.columns(2)
@@ -306,7 +320,6 @@ if pode_gerar:
     
     pdf.adicionar_acompanhamento(data_registro_ant, texto_acompanhamento)
     
-    # Adicionando a nova seção de outras ocorrências no PDF
     pdf.adicionar_outras_ocorrencias(texto_outras_ocorrencias)
     
     pdf.adicionar_assinaturas(analista_op)
