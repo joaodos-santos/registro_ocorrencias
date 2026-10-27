@@ -15,14 +15,23 @@ class RelatorioSegurancaPDF(FPDF):
         self.set_auto_page_break(auto=True, margin=15)
 
     def header(self):
+        try:
+            self.image("assets/decea.png", x=10, y=8, w=18)
+            self.image("assets/cindacta3.png", x=182, y=8, w=18)
+        except:
+            pass
+            
+        self.set_y(12)
         self.set_font("helvetica", "B", 10)
         self.set_text_color(0, 51, 102)
-        self.cell(0, 5, "CINDACTA III - CÉLULA DE SEGURANÇA OPERACIONAL", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 5, "CINDACTA III - SEGURANÇA OPERACIONAL", align="C", new_x="LMARGIN", new_y="NEXT")
         self.set_font("helvetica", "B", 12)
         self.cell(0, 6, "RELATÓRIO DIÁRIO DE OCORRÊNCIAS DE SEGURANÇA - TVTOP PBCS", align="C", new_x="LMARGIN", new_y="NEXT")
+        
+        self.ln(4)
         self.set_draw_color(0, 51, 102)
         self.set_line_width(0.5)
-        self.line(10, self.get_y() + 2, 200, self.get_y() + 2)
+        self.line(10, self.get_y(), 200, self.get_y())
         self.ln(5)
 
     def footer(self):
