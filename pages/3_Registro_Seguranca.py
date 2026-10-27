@@ -69,7 +69,7 @@ class RelatorioSegurancaPDF(FPDF):
         self.desenhar_secao(f"3. DETALHAMENTO: FICHA DE OCORRÊNCIA N° {num:02d}")
         
         self.set_font("helvetica", "B", 9)
-        self.multi_cell(0, 5, f"Indicador Afetado: {ind_afetado}", new_x="LMARGIN", new_y="NEXT")
+        self.multi_cell(0, 5, f"Questão / Indicador Afetado:\n{ind_afetado}", new_x="LMARGIN", new_y="NEXT")
         self.ln(2)
         
         self.cell(0, 5, "Constatação, Horários e Criticidade:", new_x="LMARGIN", new_y="NEXT")
@@ -171,7 +171,6 @@ def atualizar_horarios_seg():
         st.session_state["hr_in_seg"] = datetime.time(23, 0)
         st.session_state["hr_out_seg"] = datetime.time(6, 0)
 
-# Inicialização padrão para a primeira vez que a página carrega
 if "hr_in_seg" not in st.session_state:
     st.session_state["hr_in_seg"] = datetime.time(13, 0)
     st.session_state["hr_out_seg"] = datetime.time(19, 0)
@@ -200,95 +199,124 @@ st.markdown("### 2. DECLARAÇÃO GERAL")
 with st.container(border=True):
     plantao_sem_alteracoes = st.toggle("✅ DECLARAÇÃO DE TURNO SEM ANOMALIAS (Marcar se NÃO HOUVE ocorrências de segurança no turno)", value=False, key="toggle_seg")
 
-lista_indicadores_seg = [
-    "P1-01: Aplicação dos mínimos de separação por performance",
-    "P1-02: Interpretação dos alertas e/ou avisos PBCS",
-    "P1-03: Utilização das ferramentas do SAGITARIO associadas ao PBCS",
-    "P1-04: Identificação dos desvios laterais",
-    "P1-05: Setorizações em relação à carga de trabalho",
-    "P1-06: Procedimentos alternativos de comunicação (falha do meio primário)",
-    "P1-07: Utilização do zoom do SAGITARIO",
-    "P1-08: Utilização da funcionalidade 'Nova Janela' do SAGITARIO",
-    "P1-09: Identificação da perda das condições para separação PBCS (degradação)",
-    "P1-10: Procedimentos para o restabelecimento dos mínimos convencionais (degradação)",
-    "P1-11: Manutenção da consciência situacional na transição (degradação)",
-    "P3-01: Transferências para as FIR adjacentes nacionais",
-    "P3-02: Transferências para as FIR adjacentes estrangeiras",
-    "P3-03: Dúvidas quanto à aplicação correta da separação",
-    "P3-04: Transferências em condições incompatíveis com a separação",
-    "P3-05: Intervenções ou coordenação adicionais (adequação da separação)",
-    "P4-01: Interpretação ou percepção das informações nos planos de voo",
-    "P4-02: Ações esperadas do ATCO na degradação do enlace de dados",
-    "P4-03: Procedimentos após falha na criação das pistas navegadas",
-    "P4-04: Verificação do status PBCS no plano de voo",
-    "P4-05: Procedimentos para permanência dos parâmetros PBCS (ausência de conexão)",
-    "P4-06: Procedimentos para permanência da indicação de conexão (após desabilitação)",
-    "P5-01: Inserção de dados de capacidade PBCS na confecção do plano de voo",
-    "P5-02: Interação do ATCO com o plano pré-ativo para modificar status PBCS",
-    "P5-03: Solicitação ou criação de planos de voo a partir de dados anteriores",
-    "P5-04: Correção dos dados do plano de voo relacionados à capacidade PBCS",
-    "P5-05: FPL não recebido pelo ACC-AO",
-    "GRSO-01: Formulários LLE/LLD e notificações (SRO/FNO) para desvios horizontais",
-    "GRSO-02: Notificações voluntárias referentes às condições latentes (RELPREV)"
-]
+
+# --- Dicionário de Perigos, Perguntas e Gatilhos de Anomalia ---
+# Formato: "Pergunta": "Resposta que configura Anomalia"
+checklist_seguranca = {
+    "PERIGO 1: Aplicação incorreta da separação PBCS": [
+        ("Foram aplicados os mínimos de separação por performance corretamente?", "Não"),
+        ("Os alertas e/ou avisos PBCS foram interpretados corretamente?", "Não"),
+        ("O ATCO utilizou adequadamente as ferramentas do SAGITARIO associadas ao PBCS?", "Não"),
+        ("O ATCO identificou os desvios laterais de maneira adequada ao cenário?", "Não"),
+        ("O Supervisor/Encarregado realizou as setorizações corretamente, de acordo com a carga de trabalho?", "Não"),
+        ("Os procedimentos alternativos de comunicação, em situações de falha do meio primário, foram utilizados conforme previsto?", "Não"),
+        ("O zoom do SAGITARIO foi utilizado de maneira efetiva, de acordo com o cenário e a evolução dos tráfegos?", "Não"),
+        ("A funcionalidade do SAGITARIO 'Nova Janela' foi utilizada de forma adequada?", "Não"),
+        ("Em uma situação de degradação do STVD e/ou do enlace de dados, o ATCO identificou a perda das condições necessárias para a separação PBCS?", "Não"),
+        ("Em uma situação de degradação do STVD e/ou do enlace de dados, o ATCO adotou os procedimentos previstos para o restabelecimento dos mínimos previstos para a separação convencional?", "Não"),
+        ("Em uma situação de degradação do STVD e/ou do enlace de dados, o ATCO demonstrou a manutenção da consciência situacional durante a transição para a separação convencional?", "Não")
+    ],
+    "PERIGO 2: Aplicação incorreta da separação CDP": [
+        ("Separação CDP não avaliada no TVTOP", "N/A") # Placeholder estrutural (conforme manual)
+    ],
+    "PERIGO 3: Transferência dos tráfegos para as FIR estrangeiras com a separação menor que a prevista": [
+        ("As transferências para as FIR adjacentes nacionais foram realizadas conforme previsto?", "Não"),
+        ("As transferências para as FIR adjacentes estrangeiras foram realizadas conforme previsto?", "Não"),
+        ("Foram observadas dúvidas quanto à aplicação correta da separação prevista durante o recebimento ou a transferência dos tráfegos?", "Sim"),
+        ("Foram observadas transferências de tráfegos em condições incompatíveis com a separação prevista?", "Sim"),
+        ("Foram observadas intervenções ou coordenação adicionais, devido a necessidade de adequação da separação aplicada durante a transferência dos tráfegos?", "Sim")
+    ],
+    "PERIGO 4: Aplicação incorreta dos procedimentos operacionais após a perda da capacidade PBCS geral ou parcial, ou após a não conexão datalink de uma aeronave capacitada": [
+        ("Em situações de degradação total ou parcial, houve erros de interpretação ou percepção quanto às informações que constam nos planos de voo?", "Sim"),
+        ("As ações esperadas do ATCO, relacionadas à degradação total ou parcial do sistema de enlace de dados, foram atendidas?", "Não"),
+        ("O ATCO identificou e realizou os procedimentos previstos após a falha na criação das pistas navegadas durante uma situação de degradação total ou parcial do enlace de dados?", "Não"),
+        ("O ATCO verificou o status PBCS no plano de voo durante uma situação de degradação total ou parcial do enlace de dados?", "Não"),
+        ("O ATCO realizou o procedimento previsto em situações de permanência dos parâmetros PBCS da aeronave declarados em plano de voo após a ausência de conexão datalink para operadores que declaram capacidade PBCS?", "Não"),
+        ("O ATCO realizou o procedimento previsto em situações de permanência da indicação de conexão datalink para a aviônica após o SAGITARIO desabilitar as funções datalink para o ATCO?", "Não")
+    ],
+    "PERIGO 5: Inserção incorreta das capacidades operacionais PBCS da aeronave no plano de voo": [
+        ("Houve alguma situação de inserção de dados relativos à capacidade PBCS durante a solicitação de confecção do plano de voo ao operador AIS?", "Sim"),
+        ("Houve alguma interação do ATCO com o plano pré-ativo, a fim de modificar o status PBCS da aeronave?", "Sim"),
+        ("Houve a solicitação ou a criação de planos de voo a partir de dados anteriores (plano de voo terminados)?", "Sim"),
+        ("Houve alguma correção dos dados do plano de voo relacionados a capacidade PBCS?", "Sim"),
+        ("Houve alguma situação em que o FPL não foi recebido pelo ACC-AO?", "Sim")
+    ],
+    "FERRAMENTAS GRSO": [
+        ("Foram utilizados, nos casos de desvios horizontais, os formulários LLE/LLD e realizadas as respectivas notificações (SRO/FNO)?", "Não"),
+        ("Foram realizadas notificações voluntárias referentes às condições latentes, por meio de RELPREV?", "Não")
+    ]
+}
 
 ocorrencias_registradas = []
 formulario_valido = True
 
 # --- SEÇÃO 3: Triagem e Fichas Múltiplas ---
 if not plantao_sem_alteracoes:
-    st.markdown("### 3. DETALHAMENTO DAS OCORRÊNCIAS OBSERVADAS")
-    st.info("Caso seja observada uma anomalia em algum item do checklist, marque 'Sim' e informe a quantidade de eventos distintos no turno.")
+    st.markdown("### 3. DETALHAMENTO DO CHECKLIST")
+    st.info("Responda as perguntas abaixo. Caso a resposta indique uma anomalia para aquele item, a Ficha de Ocorrência será disponibilizada para preenchimento.")
     
-    for ind in lista_indicadores_seg:
-        observado = st.radio(f"**{ind}** - Observado anomalia?", ["Não", "Sim"], horizontal=True, key=f"rad_seg_{ind}")
+    for perigo, perguntas in checklist_seguranca.items():
+        st.markdown(f"#### {perigo}")
         
-        if observado == "Sim":
-            qtd_eventos = st.number_input(f"Quantidade de ocorrências registradas", min_value=1, max_value=20, value=1, step=1, key=f"qtd_{ind}")
+        # Oculta as perguntas do Perigo 2 conforme a restrição do manual
+        if "PERIGO 2" in perigo:
+            st.caption("*(Não avaliado no TVTOP)*")
+            continue
             
-            for i in range(qtd_eventos):
-                with st.container(border=True):
-                    st.markdown(f"📄 **Ficha de Ocorrência (Evento {i+1} de {qtd_eventos}):** {ind}")
-                    
-                    c1, c2, c3 = st.columns(3)
-                    origem = c1.selectbox("Método de Coleta", ["Observação direta da operação", "Relato de Perigo (RELPER)", "Outro"], key=f"orig_seg_{ind}_{i}")
-                    h_in = c2.text_input("Horário Início (Z) Ex: 1430", key=f"hin_seg_{ind}_{i}")
-                    h_out = c3.text_input("Horário Término (Z) Opcional", key=f"hout_seg_{ind}_{i}")
-                    
-                    criticidade = st.selectbox("Classificação da Ocorrência", 
-                                               ["NÃO CRÍTICO (Escrito no relatório diário)", 
-                                                "CRÍTICO (Comunicar imediatamente ao supervisor local e avaliar suspensão)"], 
-                                               key=f"crit_seg_{ind}_{i}")
-                    
-                    ca1, ca2 = st.columns(2)
-                    callsigns = ca1.text_input("Callsign(s) / Matrícula(s) da Aeronave", key=f"call_seg_{ind}_{i}")
-                    setor = ca2.text_input("Posição ATC / Setor", key=f"setor_seg_{ind}_{i}")
-                    
-                    descricao = st.text_area("Descrição detalhada do Evento", key=f"desc_seg_{ind}_{i}")
-                    
-                    st.markdown("**Ações Adotadas pela Equipe/Supervisão:**")
-                    cb1, cb2 = st.columns(2)
-                    acao_relper = cb1.checkbox("Preenchimento de RELPER", key=f"acao_relper_{ind}_{i}")
-                    acao_fno = cb2.checkbox("Abrir FNO / Avaliar retorno", key=f"acao_fno_{ind}_{i}")
-                    outras_acoes = st.text_input("Outras providências", key=f"outras_seg_{ind}_{i}")
-                    
-                    if not descricao.strip() or not h_in.strip():
-                        st.warning(f"⚠️ Preencha pelo menos o 'Horário de Início' e a 'Descrição do Evento' no Evento {i+1}.")
-                        formulario_valido = False
-                    else:
-                        ocorrencias_registradas.append({
-                            "indicador": f"{ind} (Evento {i+1})",
-                            "origem": origem,
-                            "h_inicio": h_in,
-                            "h_fim": h_out,
-                            "criticidade": criticidade.split(" (")[0], 
-                            "callsigns": callsigns,
-                            "setor": setor,
-                            "descricao": descricao,
-                            "acao_relper": acao_relper,
-                            "acao_fno": acao_fno,
-                            "outras_acoes": outras_acoes
-                        })
+        for idx_p, (pergunta, resposta_anomalia) in enumerate(perguntas):
+            # Gera um ID único e seguro baseado no perigo e no index da pergunta
+            p_id = f"rad_{perigo[:8].replace(' ', '')}_{idx_p}"
+            
+            resposta = st.radio(f"**{pergunta}**", ["Sim", "Não", "N/A"], index=2, horizontal=True, key=p_id)
+            
+            # Lógica inteligente: se a resposta equivaler a uma anomalia, abre o form
+            if resposta == resposta_anomalia:
+                qtd_eventos = st.number_input(f"⚠️ Quantidade de ocorrências vinculadas a esta questão", min_value=1, max_value=20, value=1, step=1, key=f"qtd_{p_id}")
+                
+                for i in range(qtd_eventos):
+                    with st.container(border=True):
+                        st.markdown(f"📄 **Ficha de Ocorrência (Evento {i+1} de {qtd_eventos}):**")
+                        
+                        c1, c2, c3 = st.columns(3)
+                        origem = c1.selectbox("Método de Coleta", ["Observação direta da operação", "Relato de Perigo (RELPER)", "Outro"], key=f"orig_{p_id}_{i}")
+                        h_in = c2.text_input("Horário Início (Z) Ex: 1430", key=f"hin_{p_id}_{i}")
+                        h_out = c3.text_input("Horário Término (Z) Opcional", key=f"hout_{p_id}_{i}")
+                        
+                        criticidade = st.selectbox("Classificação da Ocorrência", 
+                                                   ["NÃO CRÍTICO (Escrito no relatório diário)", 
+                                                    "CRÍTICO (Comunicar imediatamente ao supervisor local e avaliar suspensão)"], 
+                                                   key=f"crit_{p_id}_{i}")
+                        
+                        ca1, ca2 = st.columns(2)
+                        callsigns = ca1.text_input("Callsign(s) / Matrícula(s) da Aeronave", key=f"call_{p_id}_{i}")
+                        setor = ca2.text_input("Posição ATC / Setor", key=f"setor_{p_id}_{i}")
+                        
+                        descricao = st.text_area("Descrição detalhada do Evento", key=f"desc_{p_id}_{i}")
+                        
+                        st.markdown("**Ações Adotadas pela Equipe/Supervisão:**")
+                        cb1, cb2 = st.columns(2)
+                        acao_relper = cb1.checkbox("Preenchimento de RELPER", key=f"acao_relper_{p_id}_{i}")
+                        acao_fno = cb2.checkbox("Abrir FNO / Avaliar retorno", key=f"acao_fno_{p_id}_{i}")
+                        outras_acoes = st.text_input("Outras providências", key=f"outras_seg_{p_id}_{i}")
+                        
+                        if not descricao.strip() or not h_in.strip():
+                            st.warning(f"⚠️ Preencha pelo menos o 'Horário de Início' e a 'Descrição do Evento' no Evento {i+1}.")
+                            formulario_valido = False
+                        else:
+                            ocorrencias_registradas.append({
+                                "indicador": f"[{perigo.split(':')[0]}] {pergunta} (Evento {i+1})",
+                                "origem": origem,
+                                "h_inicio": h_in,
+                                "h_fim": h_out,
+                                "criticidade": criticidade.split(" (")[0], 
+                                "callsigns": callsigns,
+                                "setor": setor,
+                                "descricao": descricao,
+                                "acao_relper": acao_relper,
+                                "acao_fno": acao_fno,
+                                "outras_acoes": outras_acoes
+                            })
+        st.markdown("---") # Linha divisória entre perigos
 else:
     st.success("✅ Turno sem ocorrências de segurança. O relatório será gerado contendo a Declaração de Normalidade.")
 
@@ -337,7 +365,6 @@ if pode_gerar:
     
     pdf.adicionar_acompanhamento(data_registro_ant, texto_acompanhamento)
     
-    # Adicionando a nova seção de outras ocorrências no PDF
     pdf.adicionar_outras_ocorrencias(texto_outras_ocorrencias)
     
     pdf.adicionar_assinaturas(analista_seg)
