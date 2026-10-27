@@ -19,7 +19,7 @@ class RelatorioTVTOpPDF(FPDF):
             self.image("assets/decea.png", x=10, y=8, w=18)
             self.image("assets/cindacta3.png", x=182, y=8, w=18)
         except:
-            pass # Ignora caso as imagens ainda não tenham subido para o GitHub
+            pass
             
         self.set_y(12)
         self.set_font("helvetica", "B", 10)
@@ -28,7 +28,8 @@ class RelatorioTVTOpPDF(FPDF):
         self.set_font("helvetica", "B", 12)
         self.cell(0, 6, "RELATÓRIO DIÁRIO DE OCORRÊNCIAS TÉCNICAS - TVTOP PBCS", align="C", new_x="LMARGIN", new_y="NEXT")
         
-        self.ln(4)
+        # Força a linha a ser desenhada abaixo do limite inferior das imagens
+        self.set_y(32)
         self.set_draw_color(0, 51, 102)
         self.set_line_width(0.5)
         self.line(10, self.get_y(), 200, self.get_y())

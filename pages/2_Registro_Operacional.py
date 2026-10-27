@@ -28,7 +28,7 @@ class RelatorioOperacionalPDF(FPDF):
         self.set_font("helvetica", "B", 12)
         self.cell(0, 6, "RELATÓRIO DIÁRIO DE OCORRÊNCIAS OPERACIONAIS - TVTOP PBCS", align="C", new_x="LMARGIN", new_y="NEXT")
         
-        self.ln(4)
+        self.set_y(32)
         self.set_draw_color(0, 51, 102)
         self.set_line_width(0.5)
         self.line(10, self.get_y(), 200, self.get_y())
