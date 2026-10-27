@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  tvtop:
+    image: tvtop_pbcs:1.0
+    container_name: tvtop_app
+    environment:
+      - VIRTUAL_HOST=tvtop.tiop.cindacta3.intraer
+      - VIRTUAL_PORT=8501
+    ports:
+      - "8501:8501"
+    restart: always
