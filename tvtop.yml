@@ -1,7 +1,7 @@
 version: '3.3'
 services:
   tvtop:
-    image: tvtop_pbcs:1.0
+    image: tvtop_pbcs:1.1_Intraer
     container_name: tvtop_app
     environment:
       - VIRTUAL_HOST=tvtop.cindacta3.intraer
