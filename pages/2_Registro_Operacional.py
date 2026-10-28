@@ -1,6 +1,8 @@
 import streamlit as st
 from fpdf import FPDF
 import datetime
+import json
+import os
 
 # Dicionário para garantir o mês em português
 MESES_PT = {1: 'JAN', 2: 'FEV', 3: 'MAR', 4: 'ABR', 5: 'MAI', 6: 'JUN', 
@@ -171,6 +173,65 @@ class RelatorioOperacionalPDF(FPDF):
 # INTERFACE STREAMLIT DA PÁGINA
 # ==========================================
 st.set_page_config(page_title="Registro Operacional", layout="wide")
+
+# ==========================================
+# LÓGICA DE PERSISTÊNCIA DE DADOS (JSON)
+# ==========================================
+ARQUIVO_RASCUNHO = "/tiop/dados-containers/tvtop/rascunho_operacional.json"
+
+class RascunhoEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (datetime.date, datetime.time)):
+            return obj.isoformat()
+        return super().default(obj)
+
+agora = datetime.datetime.now()
+if agora.hour < 8:
+    data_operacional = (agora - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+else:
+    data_operacional = agora.strftime("%Y-%m-%d")
+
+if "rascunho_carregado_op" not in st.session_state:
+    st.session_state["rascunho_carregado_op"] = True
+    if os.path.exists(ARQUIVO_RASCUNHO):
+        try:
+            with open(ARQUIVO_RASCUNHO, "r") as f:
+                conteudo = json.load(f)
+                if conteudo.get("data_registro") == data_operacional:
+                    for chave, valor in conteudo.get("dados", {}).items():
+                        if isinstance(valor, str):
+                            if "hr_" in chave:
+                                try: valor = datetime.time.fromisoformat(valor)
+                                except: pass
+                            elif "data_" in chave:
+                                try: valor = datetime.date.fromisoformat(valor)
+                                except: pass
+                        st.session_state[chave] = valor
+        except Exception:
+            pass
+
+def salvar_tela_inteira():
+    dados_tela = {k: v for k, v in st.session_state.items() if not k.startswith("FormSubmitter") and k != "rascunho_carregado_op"}
+    estado_atual = {
+        "data_registro": data_operacional,
+        "dados": dados_tela
+    }
+    try:
+        with open(ARQUIVO_RASCUNHO, "w") as f:
+            json.dump(estado_atual, f, cls=RascunhoEncoder)
+    except Exception:
+        pass
+
+if st.sidebar.button("🗑️ Iniciar Novo Registro Operacional (Zerar)"):
+    if os.path.exists(ARQUIVO_RASCUNHO):
+        try:
+            os.remove(ARQUIVO_RASCUNHO)
+        except:
+            pass
+    st.session_state.clear()
+    st.rerun()
+# ==========================================
+
 
 # Função para atualizar horários baseados na fase selecionada
 def atualizar_horarios_op():
@@ -350,3 +411,6 @@ if pode_gerar:
 else:
     st.button("🚀 Gerar e Baixar PDF Operacional", type="primary", disabled=True)
     st.error("⚠️ Preencha os 3 nomes da equipe (Sup ACC, Sup TIOP e Analista) e corrija os avisos do formulário para liberar o download do PDF.")
+
+# Gatilho automático de salvamento JSON
+salvar_tela_inteira()
