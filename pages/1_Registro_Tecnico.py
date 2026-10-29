@@ -177,10 +177,19 @@ class RelatorioTVTOpPDF(FPDF):
 # ==========================================
 st.set_page_config(page_title="Registro Técnico", layout="wide")
 
+# 1. TRAVA DE SEGURANÇA E OCULTAÇÃO DA BARRA LATERAL
+if "usuario_arquivo" not in st.session_state:
+    st.switch_page("Home.py") # Expulsa quem tentar acessar pela URL direto
+
+# Injeta CSS para sumir com a barra lateral e prender o usuário na página
+st.markdown("<style>[data-testid='collapsedControl'] {display: none;}</style>", unsafe_allow_html=True)
+
 # ==========================================
 # LÓGICA DE PERSISTÊNCIA DE DADOS (JSON)
 # ==========================================
-ARQUIVO_RASCUNHO = "/tiop/dados-containers/tvtop/rascunho_tecnico.json"
+# 2. RASCUNHO DINÂMICO (Usa o nome digitado na Home para criar um arquivo único)
+usuario_arq = st.session_state["usuario_arquivo"]
+ARQUIVO_RASCUNHO = f"/tiop/dados-containers/tvtop/rascunho_tecnico_{usuario_arq}.json"
 
 class RascunhoEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -247,8 +256,8 @@ def limpar_dados_tecnico():
             
     st.components.v1.html("<script>window.parent.location.reload();</script>", height=0)
 
-if st.sidebar.button("🗑️ Iniciar Novo Registro Técnico (Zerar)"):
-    limpar_dados_tecnico()
+#if st.sidebar.button("🗑️ Iniciar Novo Registro Técnico (Zerar)"):
+ #   limpar_dados_tecnico()
 
 # ==========================================
 
@@ -447,5 +456,7 @@ else:
     st.button("🚀 Gerar e Baixar PDF Oficial", type="primary", disabled=True)
     st.error("⚠️ Preencha os 3 nomes da equipe (Sup TIOP, Sup ACC e Analista) e corrija os avisos do formulário para liberar o download do PDF.")
 
+if st.button("🗑️ Iniciar Novo Registro Técnico (Zerar Formulário)"):
+    limpar_dados_tecnico()
 # Gatilho automático de salvamento JSON
 salvar_tela_inteira()
