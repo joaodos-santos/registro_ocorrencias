@@ -9,6 +9,9 @@ st.set_page_config(
     layout="centered"
 )
 
+
+st.markdown("<style>[data-testid='stSidebarNav'] {display: none;}</style>", unsafe_allow_html=True)
+
 # ==========================================
 # CABEÇALHO INFORMATIVO
 # ==========================================
@@ -58,6 +61,7 @@ with st.container(border=True):
             # Salva os dados na memória da sessão atual
             st.session_state["usuario_tela"] = nome_preenchedor.strip()
             st.session_state["usuario_arquivo"] = nome_arquivo
+            st.session_state["perfil_autorizado"] = perfil
             
             # Arremessa o usuário para a página correspondente
             if perfil == "Técnico":

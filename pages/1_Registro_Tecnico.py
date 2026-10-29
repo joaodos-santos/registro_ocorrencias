@@ -177,12 +177,28 @@ class RelatorioTVTOpPDF(FPDF):
 # ==========================================
 st.set_page_config(page_title="Registro Técnico", layout="wide")
 
+# ==========================================
 # 1. TRAVA DE SEGURANÇA E OCULTAÇÃO DA BARRA LATERAL
-if "usuario_arquivo" not in st.session_state:
-    st.switch_page("Home.py") # Expulsa quem tentar acessar pela URL direto
+# ==========================================
+# Esconde a barra lateral visualmente
+st.markdown("""
+    <style>
+        [data-testid="stSidebar"] {display: none;}
+        [data-testid="collapsedControl"] {display: none;}
+    </style>
+""", unsafe_allow_html=True)
 
-# Injeta CSS para sumir com a barra lateral e prender o usuário na página
-st.markdown("<style>[data-testid='collapsedControl'] {display: none;}</style>", unsafe_allow_html=True)
+# Se tentar acessar sem nem ter passado pelo login, manda pro Início
+if "usuario_arquivo" not in st.session_state:
+    st.switch_page("Principal.py")
+
+# Se o usuário logou, mas escolheu outro perfil na tela inicial:
+if st.session_state.get("perfil_autorizado") != "Técnico":
+    st.warning(f"⚠️ **Acesso Restrito.** Você iniciou o turno logado como **{st.session_state.get('perfil_autorizado')}**.")
+    st.info("Para acessar o Registro Técnico, retorne à página inicial e selecione o perfil correto.")
+    if st.button("🏠 Voltar para o Início"):
+        st.switch_page("Principal.py")
+    st.stop() # Freio de mão: impede o Python de ler o resto do arquivo e criar o JSON errado!
 
 # ==========================================
 # LÓGICA DE PERSISTÊNCIA DE DADOS (JSON)
