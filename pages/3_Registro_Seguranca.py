@@ -180,9 +180,12 @@ ARQUIVO_RASCUNHO = "/tiop/dados-containers/tvtop/rascunho_seguranca.json"
 
 class RascunhoEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, (datetime.date, datetime.time)):
+        if isinstance(obj, (datetime.date, datetime.time, datetime.datetime)):
             return obj.isoformat()
-        return super().default(obj)
+        try:
+            return super().default(obj)
+        except TypeError:
+            return str(obj)
 
 agora = datetime.datetime.now()
 if agora.hour < 8:
@@ -190,27 +193,26 @@ if agora.hour < 8:
 else:
     data_operacional = agora.strftime("%Y-%m-%d")
 
-if "rascunho_carregado_seg" not in st.session_state:
-    st.session_state["rascunho_carregado_seg"] = True
-    if os.path.exists(ARQUIVO_RASCUNHO):
-        try:
-            with open(ARQUIVO_RASCUNHO, "r") as f:
-                conteudo = json.load(f)
-                if conteudo.get("data_registro") == data_operacional:
-                    for chave, valor in conteudo.get("dados", {}).items():
+if os.path.exists(ARQUIVO_RASCUNHO):
+    try:
+        with open(ARQUIVO_RASCUNHO, "r") as f:
+            conteudo = json.load(f)
+            if conteudo.get("data_registro") == data_operacional:
+                for chave, valor in conteudo.get("dados", {}).items():
+                    if chave not in st.session_state:
                         if isinstance(valor, str):
                             if "hr_" in chave:
                                 try: valor = datetime.time.fromisoformat(valor)
                                 except: pass
-                            elif "data_" in chave:
+                            elif "data" in chave:
                                 try: valor = datetime.date.fromisoformat(valor)
                                 except: pass
                         st.session_state[chave] = valor
-        except Exception:
-            pass
+    except Exception:
+        pass
 
 def salvar_tela_inteira():
-    dados_tela = {k: v for k, v in st.session_state.items() if not k.startswith("FormSubmitter") and k != "rascunho_carregado_seg"}
+    dados_tela = {k: v for k, v in st.session_state.items() if k.startswith("seg_") and not k.startswith("FormSubmitter")}
     estado_atual = {
         "data_registro": data_operacional,
         "dados": dados_tela
@@ -218,32 +220,39 @@ def salvar_tela_inteira():
     try:
         with open(ARQUIVO_RASCUNHO, "w") as f:
             json.dump(estado_atual, f, cls=RascunhoEncoder)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Erro ao salvar JSON no arquivo {ARQUIVO_RASCUNHO}: {e}")
 
-if st.sidebar.button("🗑️ Iniciar Novo Registro de Segurança (Zerar)"):
+def limpar_dados_seguranca():
     if os.path.exists(ARQUIVO_RASCUNHO):
         try:
             os.remove(ARQUIVO_RASCUNHO)
         except:
             pass
-    st.session_state.clear()
-    st.rerun()
+            
+    for chave in list(st.session_state.keys()):
+        if chave.startswith("seg_"):
+            del st.session_state[chave]
+            
+    st.components.v1.html("<script>window.parent.location.reload();</script>", height=0)
+
+if st.sidebar.button("🗑️ Iniciar Novo Registro de Segurança (Zerar)"):
+    limpar_dados_seguranca()
 # ==========================================
 
 
 # Função para atualizar horários baseados na fase selecionada
 def atualizar_horarios_seg():
-    if "Fase 1" in st.session_state["fase_seg"]:
-        st.session_state["hr_in_seg"] = datetime.time(13, 0)
-        st.session_state["hr_out_seg"] = datetime.time(19, 0)
+    if "Fase 1" in st.session_state.get("seg_fase", ""):
+        st.session_state["seg_hr_in"] = datetime.time(13, 0)
+        st.session_state["seg_hr_out"] = datetime.time(19, 0)
     else:
-        st.session_state["hr_in_seg"] = datetime.time(23, 0)
-        st.session_state["hr_out_seg"] = datetime.time(6, 0)
+        st.session_state["seg_hr_in"] = datetime.time(23, 0)
+        st.session_state["seg_hr_out"] = datetime.time(6, 0)
 
-if "hr_in_seg" not in st.session_state:
-    st.session_state["hr_in_seg"] = datetime.time(13, 0)
-    st.session_state["hr_out_seg"] = datetime.time(19, 0)
+if "seg_hr_in" not in st.session_state:
+    st.session_state["seg_hr_in"] = datetime.time(13, 0)
+    st.session_state["seg_hr_out"] = datetime.time(19, 0)
 
 st.title("🛡️ TVTOP PBCS - Registro de Segurança")
 
@@ -251,23 +260,23 @@ st.title("🛡️ TVTOP PBCS - Registro de Segurança")
 st.markdown("### 1. IDENTIFICAÇÃO DO TURNO E DA JANELA DE TESTE")
 with st.container(border=True):
     col_data, col_fase, col_hin, col_hout = st.columns(4)
-    data_relatorio = col_data.date_input("Data do Relatório", datetime.date.today(), key="data_seg")
-    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="fase_seg", on_change=atualizar_horarios_seg)
-    hr_inicio = col_hin.time_input("Início (UTC)", key="hr_in_seg")
-    hr_fim = col_hout.time_input("Término (UTC)", key="hr_out_seg")
+    data_relatorio = col_data.date_input("Data do Relatório", datetime.date.today(), key="seg_data")
+    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="seg_fase", on_change=atualizar_horarios_seg)
+    hr_inicio = col_hin.time_input("Início (UTC)", key="seg_hr_in")
+    hr_fim = col_hout.time_input("Término (UTC)", key="seg_hr_out")
     
     st.markdown("##### Equipe de Serviço")
     c_tiop, c_acc = st.columns(2)
-    sup_tiop = c_tiop.text_input("Supervisor Técnico (TIOP)", key="sup_tiop_seg")
-    sup_acc = c_acc.text_input("Supervisor Operacional (ACC-AO)", key="sup_acc_seg")
+    sup_tiop = c_tiop.text_input("Supervisor Técnico (TIOP)", key="seg_sup_tiop")
+    sup_acc = c_acc.text_input("Supervisor Operacional (ACC-AO)", key="seg_sup_acc")
     
     st.markdown("##### Equipe TVTOP")
-    analista_seg = st.text_input("Analista de Segurança", key="analista_seg")
+    analista_seg = st.text_input("Analista de Segurança", key="seg_analista")
 
 # --- SEÇÃO 2: Declaração Geral ---
 st.markdown("### 2. DECLARAÇÃO GERAL")
 with st.container(border=True):
-    plantao_sem_alteracoes = st.toggle("✅ DECLARAÇÃO DE TURNO SEM ANOMALIAS (Marcar se NÃO HOUVE ocorrências de segurança no turno)", value=False, key="toggle_seg")
+    plantao_sem_alteracoes = st.toggle("✅ DECLARAÇÃO DE TURNO SEM ANOMALIAS (Marcar se NÃO HOUVE ocorrências de segurança no turno)", value=False, key="seg_toggle")
 
 
 # --- Dicionário de Perigos, Perguntas e Gatilhos de Anomalia ---
@@ -337,37 +346,37 @@ if not plantao_sem_alteracoes:
             # Gera um ID único e seguro baseado no perigo e no index da pergunta
             p_id = f"rad_{perigo[:8].replace(' ', '')}_{idx_p}"
             
-            resposta = st.radio(f"**{pergunta}**", ["Sim", "Não", "N/A"], index=2, horizontal=True, key=p_id)
+            resposta = st.radio(f"**{pergunta}**", ["Sim", "Não", "N/A"], index=2, horizontal=True, key=f"seg_{p_id}")
             
             # Lógica inteligente: se a resposta equivaler a uma anomalia, abre o form
             if resposta == resposta_anomalia:
-                qtd_eventos = st.number_input(f"⚠️ Quantidade de ocorrências vinculadas a esta questão", min_value=1, max_value=20, value=1, step=1, key=f"qtd_{p_id}")
+                qtd_eventos = st.number_input(f"⚠️ Quantidade de ocorrências vinculadas a esta questão", min_value=1, max_value=20, value=1, step=1, key=f"seg_qtd_{p_id}")
                 
                 for i in range(qtd_eventos):
                     with st.container(border=True):
                         st.markdown(f"📄 **Ficha de Ocorrência (Evento {i+1} de {qtd_eventos}):**")
                         
                         c1, c2, c3 = st.columns(3)
-                        origem = c1.selectbox("Método de Coleta", ["Observação direta da operação", "Relato de Perigo (RELPER)", "Outro"], key=f"orig_{p_id}_{i}")
-                        h_in = c2.text_input("Horário Início (Z) Ex: 1430", key=f"hin_{p_id}_{i}")
-                        h_out = c3.text_input("Horário Término (Z) Opcional", key=f"hout_{p_id}_{i}")
+                        origem = c1.selectbox("Método de Coleta", ["Observação direta da operação", "Relato de Perigo (RELPER)", "Outro"], key=f"seg_orig_{p_id}_{i}")
+                        h_in = c2.text_input("Horário Início (Z) Ex: 1430", key=f"seg_hin_{p_id}_{i}")
+                        h_out = c3.text_input("Horário Término (Z) Opcional", key=f"seg_hout_{p_id}_{i}")
                         
                         criticidade = st.selectbox("Classificação da Ocorrência", 
                                                    ["NÃO CRÍTICO (Escrito no relatório diário)", 
                                                     "CRÍTICO (Comunicar imediatamente ao supervisor local e avaliar suspensão)"], 
-                                                   key=f"crit_{p_id}_{i}")
+                                                   key=f"seg_crit_{p_id}_{i}")
                         
                         ca1, ca2 = st.columns(2)
-                        callsigns = ca1.text_input("Callsign(s) / Matrícula(s) da Aeronave", key=f"call_{p_id}_{i}")
-                        setor = ca2.text_input("Posição ATC / Setor", key=f"setor_{p_id}_{i}")
+                        callsigns = ca1.text_input("Callsign(s) / Matrícula(s) da Aeronave", key=f"seg_call_{p_id}_{i}")
+                        setor = ca2.text_input("Posição ATC / Setor", key=f"seg_setor_{p_id}_{i}")
                         
-                        descricao = st.text_area("Descrição detalhada do Evento", key=f"desc_{p_id}_{i}")
+                        descricao = st.text_area("Descrição detalhada do Evento", key=f"seg_desc_{p_id}_{i}")
                         
                         st.markdown("**Ações Adotadas pela Equipe/Supervisão:**")
                         cb1, cb2 = st.columns(2)
-                        acao_relper = cb1.checkbox("Preenchimento de RELPER", key=f"acao_relper_{p_id}_{i}")
-                        acao_fno = cb2.checkbox("Abrir FNO / Avaliar retorno", key=f"acao_fno_{p_id}_{i}")
-                        outras_acoes = st.text_input("Outras providências", key=f"outras_seg_{p_id}_{i}")
+                        acao_relper = cb1.checkbox("Preenchimento de RELPER", key=f"seg_acao_relper_{p_id}_{i}")
+                        acao_fno = cb2.checkbox("Abrir FNO / Avaliar retorno", key=f"seg_acao_fno_{p_id}_{i}")
+                        outras_acoes = st.text_input("Outras providências", key=f"seg_outras_{p_id}_{i}")
                         
                         if not descricao.strip() or not h_in.strip():
                             st.warning(f"⚠️ Preencha pelo menos o 'Horário de Início' e a 'Descrição do Evento' no Evento {i+1}.")
@@ -399,16 +408,16 @@ with st.container(border=True):
         "Data do registro da ocorrência original", 
         value=datetime.date.today(),
         max_value=datetime.date.today(),
-        key="data_ant_seg"
+        key="seg_data_ant"
     )
-    texto_acompanhamento = st.text_area("Acompanhamento / Solução", key="texto_ant_seg")
+    texto_acompanhamento = st.text_area("Acompanhamento / Solução", key="seg_texto_ant")
 
 
 # --- SEÇÃO 5: Outras Ocorrências ---
 st.markdown("### 5. OUTRAS OCORRÊNCIAS / OBSERVAÇÕES GERAIS")
 st.info("💡 Utilize este espaço para registrar demais ocorrências não abarcadas pelos itens anteriores.")
 with st.container(border=True):
-    texto_outras_ocorrencias = st.text_area("Descrição de ocorrências adicionais (Deixe em branco se não houver)", key="texto_outras_seg")
+    texto_outras_ocorrencias = st.text_area("Descrição de ocorrências adicionais (Deixe em branco se não houver)", key="seg_texto_outras")
 
 
 # --- Geração e Download do PDF ---

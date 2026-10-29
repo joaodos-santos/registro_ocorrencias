@@ -181,9 +181,12 @@ ARQUIVO_RASCUNHO = "/tiop/dados-containers/tvtop/rascunho_operacional.json"
 
 class RascunhoEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, (datetime.date, datetime.time)):
+        if isinstance(obj, (datetime.date, datetime.time, datetime.datetime)):
             return obj.isoformat()
-        return super().default(obj)
+        try:
+            return super().default(obj)
+        except TypeError:
+            return str(obj)
 
 agora = datetime.datetime.now()
 if agora.hour < 8:
@@ -191,27 +194,31 @@ if agora.hour < 8:
 else:
     data_operacional = agora.strftime("%Y-%m-%d")
 
-if "rascunho_carregado_op" not in st.session_state:
-    st.session_state["rascunho_carregado_op"] = True
-    if os.path.exists(ARQUIVO_RASCUNHO):
-        try:
-            with open(ARQUIVO_RASCUNHO, "r") as f:
-                conteudo = json.load(f)
-                if conteudo.get("data_registro") == data_operacional:
-                    for chave, valor in conteudo.get("dados", {}).items():
+# CARREGAMENTO ISOLADO
+if os.path.exists(ARQUIVO_RASCUNHO):
+    try:
+        with open(ARQUIVO_RASCUNHO, "r") as f:
+            conteudo = json.load(f)
+            if conteudo.get("data_registro") == data_operacional:
+                for chave, valor in conteudo.get("dados", {}).items():
+                    if chave not in st.session_state:
                         if isinstance(valor, str):
                             if "hr_" in chave:
                                 try: valor = datetime.time.fromisoformat(valor)
                                 except: pass
-                            elif "data_" in chave:
+                            elif "data" in chave:
                                 try: valor = datetime.date.fromisoformat(valor)
                                 except: pass
                         st.session_state[chave] = valor
-        except Exception:
-            pass
+    except Exception:
+        pass
 
+# SALVAMENTO ISOLADO (COM FILTRO op_)
 def salvar_tela_inteira():
-    dados_tela = {k: v for k, v in st.session_state.items() if not k.startswith("FormSubmitter") and k != "rascunho_carregado_op"}
+    dados_tela = {
+        k: v for k, v in st.session_state.items() 
+        if k.startswith("op_") and not k.startswith("FormSubmitter")
+    }
     estado_atual = {
         "data_registro": data_operacional,
         "dados": dados_tela
@@ -219,33 +226,42 @@ def salvar_tela_inteira():
     try:
         with open(ARQUIVO_RASCUNHO, "w") as f:
             json.dump(estado_atual, f, cls=RascunhoEncoder)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Erro ao salvar JSON no arquivo {ARQUIVO_RASCUNHO}: {e}")
 
-if st.sidebar.button("🗑️ Iniciar Novo Registro Operacional (Zerar)"):
+# LIMPEZA ISOLADA
+def limpar_dados_operacional():
     if os.path.exists(ARQUIVO_RASCUNHO):
         try:
             os.remove(ARQUIVO_RASCUNHO)
         except:
             pass
-    st.session_state.clear()
-    st.rerun()
+            
+    for chave in list(st.session_state.keys()):
+        if chave.startswith("op_"):
+            del st.session_state[chave]
+            
+    st.components.v1.html("<script>window.parent.location.reload();</script>", height=0)
+
+if st.sidebar.button("🗑️ Iniciar Novo Registro Operacional (Zerar)"):
+    limpar_dados_operacional()
+
 # ==========================================
 
 
 # Função para atualizar horários baseados na fase selecionada
 def atualizar_horarios_op():
-    if "Fase 1" in st.session_state["fase_op"]:
-        st.session_state["hr_in_op"] = datetime.time(13, 0)
-        st.session_state["hr_out_op"] = datetime.time(19, 0)
+    if "Fase 1" in st.session_state.get("op_fase", ""):
+        st.session_state["op_hr_in"] = datetime.time(13, 0)
+        st.session_state["op_hr_out"] = datetime.time(19, 0)
     else:
-        st.session_state["hr_in_op"] = datetime.time(23, 0)
-        st.session_state["hr_out_op"] = datetime.time(6, 0)
+        st.session_state["op_hr_in"] = datetime.time(23, 0)
+        st.session_state["op_hr_out"] = datetime.time(6, 0)
 
 # Inicialização padrão para a primeira vez que a página carrega
-if "hr_in_op" not in st.session_state:
-    st.session_state["hr_in_op"] = datetime.time(13, 0)
-    st.session_state["hr_out_op"] = datetime.time(19, 0)
+if "op_hr_in" not in st.session_state:
+    st.session_state["op_hr_in"] = datetime.time(13, 0)
+    st.session_state["op_hr_out"] = datetime.time(19, 0)
 
 st.title("📡 TVTOP PBCS - Registro Operacional")
 
@@ -253,23 +269,23 @@ st.title("📡 TVTOP PBCS - Registro Operacional")
 st.markdown("### 1. IDENTIFICAÇÃO DO TURNO E DA JANELA DE TESTE")
 with st.container(border=True):
     col_data, col_fase, col_hin, col_hout = st.columns(4)
-    data_relatorio = col_data.date_input("Data do Relatório", datetime.date.today(), key="data_op")
-    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="fase_op", on_change=atualizar_horarios_op)
-    hr_inicio = col_hin.time_input("Início (UTC)", key="hr_in_op")
-    hr_fim = col_hout.time_input("Término (UTC)", key="hr_out_op")
+    data_relatorio = col_data.date_input("Data do Relatório", datetime.date.today(), key="op_data")
+    fase_tvtop = col_fase.selectbox("Fase do TVTOP", ["Fase 1 (13:00-19:00Z)", "Fase 2 (23:00-06:00Z)"], key="op_fase", on_change=atualizar_horarios_op)
+    hr_inicio = col_hin.time_input("Início (UTC)", key="op_hr_in")
+    hr_fim = col_hout.time_input("Término (UTC)", key="op_hr_out")
     
     st.markdown("##### Equipe de Serviço")
     c_acc, c_tiop = st.columns(2)
-    sup_acc = c_acc.text_input("Supervisor Operacional (ACC-AO)", key="sup_acc_op")
-    sup_tiop = c_tiop.text_input("Supervisor Técnico (TIOP)", key="sup_tiop_op")
+    sup_acc = c_acc.text_input("Supervisor Operacional (ACC-AO)", key="op_sup_acc")
+    sup_tiop = c_tiop.text_input("Supervisor Técnico (TIOP)", key="op_sup_tiop")
     
     st.markdown("##### Equipe TVTOP")
-    analista_op = st.text_input("Analista Operacional", key="analista_op")
+    analista_op = st.text_input("Analista Operacional", key="op_analista")
 
 # --- SEÇÃO 2: Declaração Geral ---
 st.markdown("### 2. DECLARAÇÃO GERAL")
 with st.container(border=True):
-    plantao_sem_alteracoes = st.toggle("✅ DECLARAÇÃO DE TURNO SEM ANOMALIAS (Marcar se NÃO HOUVE ocorrências operacionais no turno)", value=False, key="toggle_op")
+    plantao_sem_alteracoes = st.toggle("✅ DECLARAÇÃO DE TURNO SEM ANOMALIAS (Marcar se NÃO HOUVE ocorrências operacionais no turno)", value=False, key="op_toggle")
 
 lista_indicadores_op = [
     "IND-OP-01: Aplicação incorreta dos mínimos de separação longitudinal/lateral",
@@ -292,37 +308,37 @@ if not plantao_sem_alteracoes:
     st.info("Caso um indicador apresente anomalias, marque 'Sim' e informe a quantidade de eventos distintos que ocorreram para ele no turno.")
     
     for ind in lista_indicadores_op:
-        observado = st.radio(f"**{ind}** - Observado?", ["Não", "Sim"], horizontal=True, key=f"rad_op_{ind}")
+        observado = st.radio(f"**{ind}** - Observado?", ["Não", "Sim"], horizontal=True, key=f"op_rad_{ind}")
         
         if observado == "Sim":
-            qtd_eventos = st.number_input(f"Quantidade de ocorrências registradas para {ind[:9]}", min_value=1, max_value=20, value=1, step=1, key=f"qtd_{ind}")
+            qtd_eventos = st.number_input(f"Quantidade de ocorrências registradas para {ind[:9]}", min_value=1, max_value=20, value=1, step=1, key=f"op_qtd_{ind}")
             
             for i in range(qtd_eventos):
                 with st.container(border=True):
                     st.markdown(f"📄 **Ficha de Ocorrência (Evento {i+1} de {qtd_eventos}):** {ind}")
                     
                     c1, c2, c3 = st.columns(3)
-                    origem = c1.selectbox("Método de Coleta", ["Observação direta da operação", "Registros do C-AIS", "Outro"], key=f"orig_op_{ind}_{i}")
-                    h_in = c2.text_input("Horário Início (Z) Ex: 1430", key=f"hin_op_{ind}_{i}")
-                    h_out = c3.text_input("Horário Término (Z) Opcional", key=f"hout_op_{ind}_{i}")
+                    origem = c1.selectbox("Método de Coleta", ["Observação direta da operação", "Registros do C-AIS", "Outro"], key=f"op_orig_{ind}_{i}")
+                    h_in = c2.text_input("Horário Início (Z) Ex: 1430", key=f"op_hin_{ind}_{i}")
+                    h_out = c3.text_input("Horário Término (Z) Opcional", key=f"op_hout_{ind}_{i}")
                     
                     criticidade = st.selectbox("Classificação da Ocorrência", 
                                                ["NÃO CRÍTICO (Escrito no relatório diário)", 
                                                 "CRÍTICO (Comunicar imediatamente ao supervisor local e avaliar suspensão)"], 
-                                               key=f"crit_op_{ind}_{i}")
+                                               key=f"op_crit_{ind}_{i}")
                     
                     ca1, ca2 = st.columns(2)
-                    callsigns = ca1.text_input("Callsign(s) / Matrícula(s) da Aeronave", key=f"call_op_{ind}_{i}")
-                    setor = ca2.text_input("Posição ATC / Setor", key=f"setor_op_{ind}_{i}")
+                    callsigns = ca1.text_input("Callsign(s) / Matrícula(s) da Aeronave", key=f"op_call_{ind}_{i}")
+                    setor = ca2.text_input("Posição ATC / Setor", key=f"op_setor_{ind}_{i}")
                     
-                    descricao = st.text_area("Descrição detalhada do Evento", key=f"desc_op_{ind}_{i}")
+                    descricao = st.text_area("Descrição detalhada do Evento", key=f"op_desc_{ind}_{i}")
                     
                     st.markdown("**Ações Adotadas pela Equipe/Supervisão:**")
                     cb1, cb2, cb3 = st.columns(3)
-                    acao_instrucao = cb1.checkbox("Reforçar instrução (Briefing/Correção)", key=f"acao_inst_{ind}_{i}")
-                    acao_fno = cb2.checkbox("Abrir FNO / Avaliar retorno", key=f"acao_fno_{ind}_{i}")
-                    acao_sisgtec = cb3.checkbox("Acionar SUP Téc. / SISGTEC", key=f"acao_sisg_{ind}_{i}")
-                    outras_acoes = st.text_input("Outras providências", key=f"outras_op_{ind}_{i}")
+                    acao_instrucao = cb1.checkbox("Reforçar instrução (Briefing/Correção)", key=f"op_acao_inst_{ind}_{i}")
+                    acao_fno = cb2.checkbox("Abrir FNO / Avaliar retorno", key=f"op_acao_fno_{ind}_{i}")
+                    acao_sisgtec = cb3.checkbox("Acionar SUP Téc. / SISGTEC", key=f"op_acao_sisg_{ind}_{i}")
+                    outras_acoes = st.text_input("Outras providências", key=f"op_outras_{ind}_{i}")
                     
                     if not descricao.strip() or not h_in.strip():
                         st.warning(f"⚠️ Preencha pelo menos o 'Horário de Início' e a 'Descrição do Evento' no Evento {i+1}.")
@@ -354,16 +370,16 @@ with st.container(border=True):
         "Data do registro da ocorrência original", 
         value=datetime.date.today(),
         max_value=datetime.date.today(),
-        key="data_ant_op"
+        key="op_data_ant"
     )
-    texto_acompanhamento = st.text_area("Acompanhamento / Solução", key="texto_ant_op")
+    texto_acompanhamento = st.text_area("Acompanhamento / Solução", key="op_texto_ant")
 
 
 # --- SEÇÃO 5: Outras Ocorrências ---
 st.markdown("### 5. OUTRAS OCORRÊNCIAS / OBSERVAÇÕES GERAIS")
 st.info("💡 Utilize este espaço para registrar demais ocorrências não abarcadas pelos itens anteriores.")
 with st.container(border=True):
-    texto_outras_ocorrencias = st.text_area("Descrição de ocorrências adicionais (Deixe em branco se não houver)", key="texto_outras_op")
+    texto_outras_ocorrencias = st.text_area("Descrição de ocorrências adicionais (Deixe em branco se não houver)", key="op_texto_outras")
 
 
 # --- Geração e Download do PDF ---
