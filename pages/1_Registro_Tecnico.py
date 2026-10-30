@@ -145,7 +145,8 @@ class RelatorioTVTOpPDF(FPDF):
         self.ln(5)
 
     def adicionar_assinaturas(self, sup_tiop, analista_tec):
-        if self.get_y() > (self.h - 60):
+        # Limite de quebra de página aumentado para acomodar as duas linhas de assinatura
+        if self.get_y() > (self.h - 80):
             self.add_page()
             
         self.desenhar_secao("6. ASSINATURA E ENCAMINHAMENTO")
@@ -157,6 +158,7 @@ class RelatorioTVTOpPDF(FPDF):
         self.set_line_width(0.3)
         self.set_draw_color(0, 0, 0)
         
+        # --- PRIMEIRA LINHA: Assinaturas Lado a Lado (Originais) ---
         self.line(20, y_atual, 90, y_atual)
         self.line(120, y_atual, 190, y_atual)
         
@@ -170,6 +172,18 @@ class RelatorioTVTOpPDF(FPDF):
         self.cell(90, 5, "Supervisor Técnico - TIOp", align="C")
         self.cell(10, 5, "")
         self.cell(90, 5, "Analista Técnico - Equipe TVTOP", align="C", new_x="LMARGIN", new_y="NEXT")
+
+        # --- SEGUNDA LINHA: Assinatura Supervisor Local (Nova) ---
+        self.ln(20) # Espaçamento para assinar a parte de cima
+        y_atual = self.get_y()
+        largura_linha = 80
+        pos_x = (self.w - largura_linha) / 2
+        
+        self.line(pos_x, y_atual, pos_x + largura_linha, y_atual)
+        
+        self.set_y(y_atual + 2)
+        self.set_font("helvetica", "B", 9)
+        self.cell(0, 5, "SUPERVISOR LOCAL", align="C", new_x="LMARGIN", new_y="NEXT")
 
 
 # ==========================================

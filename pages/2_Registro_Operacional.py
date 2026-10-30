@@ -145,7 +145,7 @@ class RelatorioOperacionalPDF(FPDF):
         self.ln(5)
 
     def adicionar_assinaturas(self, analista_op):
-        if self.get_y() > (self.h - 60):
+        if self.get_y() > (self.h - 80):
             self.add_page()
             
         self.desenhar_secao("6. ASSINATURA E ENCAMINHAMENTO")
@@ -159,6 +159,8 @@ class RelatorioOperacionalPDF(FPDF):
         
         largura_linha = 80
         pos_x = (self.w - largura_linha) / 2
+        
+        # --- PRIMEIRA LINHA: Assinatura Analista (Original) ---
         self.line(pos_x, y_atual, pos_x + largura_linha, y_atual)
         
         self.set_y(y_atual + 2)
@@ -167,6 +169,16 @@ class RelatorioOperacionalPDF(FPDF):
         
         self.set_font("helvetica", "", 8)
         self.cell(0, 5, "Analista Operacional - Equipe TVTOP", align="C", new_x="LMARGIN", new_y="NEXT")
+
+        # --- SEGUNDA LINHA: Assinatura Supervisor Local (Nova) ---
+        self.ln(20)
+        y_atual = self.get_y()
+        
+        self.line(pos_x, y_atual, pos_x + largura_linha, y_atual)
+        
+        self.set_y(y_atual + 2)
+        self.set_font("helvetica", "B", 9)
+        self.cell(0, 5, "SUPERVISOR LOCAL", align="C", new_x="LMARGIN", new_y="NEXT")
 
 
 # ==========================================

@@ -64,7 +64,7 @@ Navegue até o diretório oficial de configuração e encerre o container em exe
 
 ```bash
 cd /tiop/dados-containers/tvtop
-docker compose -f tvtop.yml down
+docker-compose -f tvtop.yml down
 ```
 
 ### D. Atualizar a Versão no Arquivo de Configuração (`tvtop.yml`)

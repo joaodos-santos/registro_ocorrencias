@@ -109,9 +109,11 @@ class RelatorioSegurancaPDF(FPDF):
         self.cell(0, 5, "Ações Adotadas:", new_x="LMARGIN", new_y="NEXT")
         self.set_font("helvetica", "", 9)
         acoes_texto = ""
-        if dados["acao_relper"]: acoes_texto += "- [X] Preenchimento de Relatório de Perigo (RELPER)\n"
-        if dados["acao_fno"]: acoes_texto += "- [X] Abrir FNO e avaliar retorno ao TVTOp\n"
-        if dados["outras_acoes"]: acoes_texto += f"- Outras: {dados['outras_acoes']}"
+        # Usa .get() para evitar quebra caso o JSON carregue um rascunho antigo
+        if dados.get("acao_relprev"): acoes_texto += "- [X] Preenchimento de RELPREV\n"
+        if dados.get("acao_fno"): acoes_texto += "- [X] Abrir FNO\n"
+        if dados.get("acao_avaliar_retorno"): acoes_texto += "- [X] Avaliar retorno\n"
+        if dados.get("outras_acoes"): acoes_texto += f"- Outras: {dados['outras_acoes']}"
         
         self.multi_cell(0, 5, acoes_texto if acoes_texto.strip() else "Nenhuma ação pré-definida assinalada.", new_x="LMARGIN", new_y="NEXT")
         
@@ -144,7 +146,7 @@ class RelatorioSegurancaPDF(FPDF):
         self.ln(5)
 
     def adicionar_assinaturas(self, analista_seg):
-        if self.get_y() > (self.h - 60):
+        if self.get_y() > (self.h - 80):
             self.add_page()
             
         self.desenhar_secao("6. ASSINATURA E ENCAMINHAMENTO")
@@ -158,6 +160,8 @@ class RelatorioSegurancaPDF(FPDF):
         
         largura_linha = 80
         pos_x = (self.w - largura_linha) / 2
+        
+        # --- PRIMEIRA LINHA: Assinatura Analista (Original) ---
         self.line(pos_x, y_atual, pos_x + largura_linha, y_atual)
         
         self.set_y(y_atual + 2)
@@ -166,6 +170,16 @@ class RelatorioSegurancaPDF(FPDF):
         
         self.set_font("helvetica", "", 8)
         self.cell(0, 5, "Analista de Segurança - Equipe TVTOP", align="C", new_x="LMARGIN", new_y="NEXT")
+        
+        # --- SEGUNDA LINHA: Assinatura Supervisor Local (Nova) ---
+        self.ln(20)
+        y_atual = self.get_y()
+        
+        self.line(pos_x, y_atual, pos_x + largura_linha, y_atual)
+        
+        self.set_y(y_atual + 2)
+        self.set_font("helvetica", "B", 9)
+        self.cell(0, 5, "SUPERVISOR LOCAL", align="C", new_x="LMARGIN", new_y="NEXT")
 
 
 # ==========================================
@@ -381,7 +395,7 @@ if not plantao_sem_alteracoes:
                         st.markdown(f"📄 **Ficha de Ocorrência (Evento {i+1} de {qtd_eventos}):**")
                         
                         c1, c2, c3 = st.columns(3)
-                        origem = c1.selectbox("Método de Coleta", ["Observação direta da operação", "Relato de Perigo (RELPER)", "Outro"], key=f"seg_orig_{p_id}_{i}")
+                        origem = c1.selectbox("Método de Coleta", ["Observação direta da operação", "Relatório de Prevenção (RELPREV)", "Outro"], key=f"seg_orig_{p_id}_{i}")
                         h_in = c2.text_input("Horário Início (Z) Ex: 1430", key=f"seg_hin_{p_id}_{i}")
                         h_out = c3.text_input("Horário Término (Z) Opcional", key=f"seg_hout_{p_id}_{i}")
                         
@@ -397,9 +411,10 @@ if not plantao_sem_alteracoes:
                         descricao = st.text_area("Descrição detalhada do Evento", key=f"seg_desc_{p_id}_{i}")
                         
                         st.markdown("**Ações Adotadas pela Equipe/Supervisão:**")
-                        cb1, cb2 = st.columns(2)
-                        acao_relper = cb1.checkbox("Preenchimento de RELPER", key=f"seg_acao_relper_{p_id}_{i}")
-                        acao_fno = cb2.checkbox("Abrir FNO / Avaliar retorno", key=f"seg_acao_fno_{p_id}_{i}")
+                        cb1, cb2, cb3 = st.columns(3)
+                        acao_relprev = cb1.checkbox("Preenchimento de RELPREV", key=f"seg_acao_relprev_{p_id}_{i}")
+                        acao_fno = cb2.checkbox("Abrir FNO", key=f"seg_acao_fno_{p_id}_{i}")
+                        acao_avaliar_retorno = cb3.checkbox("Avaliar retorno", key=f"seg_acao_retorno_{p_id}_{i}")
                         outras_acoes = st.text_input("Outras providências", key=f"seg_outras_{p_id}_{i}")
                         
                         if not descricao.strip() or not h_in.strip():
@@ -415,8 +430,9 @@ if not plantao_sem_alteracoes:
                                 "callsigns": callsigns,
                                 "setor": setor,
                                 "descricao": descricao,
-                                "acao_relper": acao_relper,
+                                "acao_relprev": acao_relprev,
                                 "acao_fno": acao_fno,
+                                "acao_avaliar_retorno": acao_avaliar_retorno,
                                 "outras_acoes": outras_acoes
                             })
         st.markdown("---") # Linha divisória entre perigos
