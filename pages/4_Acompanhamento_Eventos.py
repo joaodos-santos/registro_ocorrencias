@@ -156,8 +156,8 @@ with st.expander("➕ **ABRIR NOVO CHAMADO / EVENTO**", expanded=False):
 # 2. SEPARAÇÃO EM ABAS
 aba_analise, aba_concluidos = st.tabs(["❓ Em Análise", "✅ Concluídos"])
 
-eventos_analise = sorted([e for e in db if e["status"] == "analise"], key=obter_chave_ordenacao, reverse=True)
-eventos_concluidos = sorted([e for e in db if e["status"] == "concluido"], key=obter_chave_ordenacao, reverse=True)
+eventos_analise = sorted([e for e in db if e["status"] == "analise"], key=obter_chave_ordenacao)
+eventos_concluidos = sorted([e for e in db if e["status"] == "concluido"], key=obter_chave_ordenacao)
 
 # --- ABA: EM ANÁLISE ---
 with aba_analise:
