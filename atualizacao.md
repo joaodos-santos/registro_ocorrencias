@@ -97,7 +97,7 @@ networks:
 Com o arquivo `tvtop.yml` atualizado e na mesma pasta, suba o container limpo:
 
 ```bash
-docker compose -f tvtop.yml up -d
+docker-compose -f tvtop.yml up -d
 ```
 
 ### F. Limpeza de Imagens Órfãs e Arquivos Temporários
