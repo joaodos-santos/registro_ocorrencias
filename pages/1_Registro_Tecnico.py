@@ -306,7 +306,14 @@ if "tec_hr_in" not in st.session_state:
     st.session_state["tec_hr_in"] = datetime.time(13, 0)
     st.session_state["tec_hr_out"] = datetime.time(19, 0)
 
-st.title("🔧 TVTOP PBCS - Registro Técnico")
+col_titulo, col_sair = st.columns([8, 2])
+with col_titulo:
+    st.title("🔧 TVTOP PBCS - Registro Técnico")
+with col_sair:
+    st.markdown("<br>", unsafe_allow_html=True) # Espaçamento para alinhar com o título
+    if st.button("🚪 Sair (Logoff)", use_container_width=True):
+        st.session_state.clear()
+        st.switch_page("Principal.py")
 
 # --- SEÇÃO 1: Identificação ---
 st.markdown("### 1. IDENTIFICAÇÃO DO TURNO E DA JANELA DE TESTE")

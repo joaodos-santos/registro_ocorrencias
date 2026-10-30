@@ -45,28 +45,27 @@ with st.container(border=True):
     st.markdown("<br>", unsafe_allow_html=True)
     
     perfil = st.radio(
-        "Selecione o formulário que deseja preencher:",
-        ["Técnico", "Operacional", "Segurança"]
+        "Selecione o módulo que deseja acessar:",
+        ["Técnico", "Operacional", "Segurança", "Acompanhamento"]
     )
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if st.button("🚀 Iniciar Preenchimento", type="primary", use_container_width=True):
+    if st.button("🚀 Iniciar / Acessar", type="primary", use_container_width=True):
         if not nome_preenchedor.strip():
             st.error("⚠️ Por favor, digite seu Posto/Graduação e nome de guerra antes de continuar.")
         else:
-            # Higieniza o nome para o sistema de arquivos do Linux
             nome_arquivo = nome_preenchedor.strip().lower().replace(" ", "_").replace("/", "_")
             
-            # Salva os dados na memória da sessão atual
             st.session_state["usuario_tela"] = nome_preenchedor.strip()
             st.session_state["usuario_arquivo"] = nome_arquivo
-            st.session_state["perfil_autorizado"] = perfil
+            st.session_state["perfil_autorizado"] = perfil  
             
-            # Arremessa o usuário para a página correspondente
             if perfil == "Técnico":
                 st.switch_page("pages/1_Registro_Tecnico.py")
             elif perfil == "Operacional":
                 st.switch_page("pages/2_Registro_Operacional.py")
             elif perfil == "Segurança":
                 st.switch_page("pages/3_Registro_Seguranca.py")
+            elif perfil == "Acompanhamento":
+                st.switch_page("pages/4_Acompanhamento_Eventos.py")
