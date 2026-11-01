@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import json
 import os
 import datetime
@@ -87,7 +88,7 @@ db = carregar_db()
 usuario_atual = st.session_state.get('usuario_tela', 'Desconhecido')
 
 # ==========================================
-# MOTOR DE ORDENAÇÃO E NUMERAÇÃO
+# MOTOR DE ORDENAÇÃO E EXPORTAÇÃO
 # ==========================================
 def obter_chave_ordenacao(evento):
     try:
@@ -105,6 +106,29 @@ def obter_chave_ordenacao(evento):
 db_ordenado = sorted(db, key=obter_chave_ordenacao)
 mapa_numeracao = {evento["id"]: index + 1 for index, evento in enumerate(db_ordenado)}
 
+def exportar_csv(banco_dados):
+    """Filtra os campos e prepara o binário do CSV para download."""
+    colunas_map = {
+        "titulo": "Título da Ocorrência",
+        "data_observacao": "Data da Ocorrência",
+        "responsavel": "Responsável",
+        "chamado": "Número do Chamado"
+    }
+    
+    if not banco_dados:
+        # Retorna um CSV vazio apenas com os cabeçalhos se o banco estiver vazio
+        return pd.DataFrame(columns=list(colunas_map.values())).to_csv(index=False).encode('utf-8')
+    
+    df = pd.DataFrame(banco_dados)
+    
+    # Preenche campos ausentes com string vazia para evitar KeyError em bancos antigos
+    for col in colunas_map.keys():
+        if col not in df.columns:
+            df[col] = ""
+            
+    df_export = df[list(colunas_map.keys())].rename(columns=colunas_map)
+    return df_export.to_csv(index=False).encode('utf-8')
+
 # ==========================================
 # INTERFACE PRINCIPAL
 # ==========================================
@@ -112,6 +136,16 @@ col_titulo, col_sair = st.columns([8, 2])
 with col_titulo:
     st.title("📋 Registro de Acompanhamento de Eventos")
     st.markdown(f"**Operador logado:** {usuario_atual}")
+    
+    # Botão de Exportação CSV inserido logo abaixo do cabeçalho
+    csv_data = exportar_csv(db)
+    st.download_button(
+        label="📥 Exportar Dados para CSV",
+        data=csv_data,
+        file_name=f"acompanhamento_eventos_{datetime.date.today().strftime('%Y%m%d')}.csv",
+        mime="text/csv"
+    )
+    
 with col_sair:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🚪 Sair (Logoff)", use_container_width=True):
