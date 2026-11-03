@@ -53,7 +53,6 @@ def transacao_db(acao, dados):
             json.dump([], f)
 
     with open(DB_PATH, "r+") as f:
-        # Trava o arquivo para escrita exclusiva
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
             f.seek(0)
@@ -66,7 +65,6 @@ def transacao_db(acao, dados):
                 banco_atual.append(dados)
             
             elif acao == "editar":
-                # Procura o evento exato pelo ID e substitui
                 for i, evt in enumerate(banco_atual):
                     if evt["id"] == dados["id"]:
                         banco_atual[i] = dados
@@ -75,7 +73,6 @@ def transacao_db(acao, dados):
             elif acao == "excluir":
                 banco_atual = [e for e in banco_atual if e["id"] != dados]
 
-            # Apaga o conteúdo atual e grava o novo atualizado
             f.seek(0)
             f.truncate()
             json.dump(banco_atual, f, indent=4)
@@ -111,15 +108,26 @@ def exportar_csv(banco_dados):
         "data_observacao": "Data da Ocorrência",
         "responsavel": "Responsável",
         "chamado": "Número do Chamado",
-        "ultima_atualizacao": "Última Atualização"
+        "ultima_atualizacao": "Última Atualização",
+        "todas_atualizacoes": "Todas as Atualizações"
     }
     
-    if not banco_dados:
+    db_export = []
+    for e in banco_dados:
+        e_copy = e.copy()
+        hist = e.get("historico_atualizacoes", [])
+        if hist:
+            e_copy["todas_atualizacoes"] = " | ".join([f"[{h['data']}] {h['autor']}: {h['texto']}" for h in hist])
+            e_copy["ultima_atualizacao"] = hist[-1]["texto"]
+        else:
+            e_copy["todas_atualizacoes"] = e.get("ultima_atualizacao", "")
+        db_export.append(e_copy)
+    
+    if not db_export:
         return pd.DataFrame(columns=list(colunas_map.values())).to_csv(index=False).encode('utf-8')
     
-    df = pd.DataFrame(banco_dados)
+    df = pd.DataFrame(db_export)
     
-    # Preenche campos ausentes com string vazia
     for col in colunas_map.keys():
         if col not in df.columns:
             df[col] = ""
@@ -154,7 +162,7 @@ st.markdown("---")
 with st.expander("➕ **ABRIR NOVO CHAMADO / EVENTO**", expanded=False):
     with st.form("form_novo_evento", clear_on_submit=True):
         titulo_novo = st.text_input("Título da Ocorrência *")
-        ultima_atualizacao_novo = st.text_input("Última Atualização (Resumo curto - Opcional)")
+        ultima_atualizacao_novo = st.text_input("Primeira Atualização (Resumo inicial - Opcional)")
         
         c_obs, col1, col2 = st.columns(3)
         data_obs_novo = c_obs.date_input("Data de Observação do Evento *", format="DD/MM/YYYY")
@@ -166,6 +174,15 @@ with st.expander("➕ **ABRIR NOVO CHAMADO / EVENTO**", expanded=False):
             if not titulo_novo.strip():
                 st.error("⚠️ O Título da Ocorrência é obrigatório!")
             else:
+                data_criacao_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                historico_inicial = []
+                if ultima_atualizacao_novo.strip():
+                    historico_inicial.append({
+                        "data": data_criacao_str,
+                        "autor": usuario_atual,
+                        "texto": ultima_atualizacao_novo.strip()
+                    })
+                
                 novo_registro = {
                     "id": str(uuid.uuid4()),
                     "titulo": titulo_novo.strip(),
@@ -173,8 +190,9 @@ with st.expander("➕ **ABRIR NOVO CHAMADO / EVENTO**", expanded=False):
                     "responsavel": resp_novo.strip(),
                     "chamado": chamado_novo.strip(),
                     "ultima_atualizacao": ultima_atualizacao_novo.strip(),
+                    "historico_atualizacoes": historico_inicial,
                     "criador": usuario_atual,
-                    "data_criacao": datetime.datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "data_criacao": data_criacao_str,
                     "status": "analise",
                     "conclusao": "",
                     "data_conclusao": "",
@@ -203,7 +221,6 @@ with aba_analise:
             
             header = f"#{num_evento:02d} - ❓ {evento['titulo']} | Resp: {resp_exibicao} | Chamado: {chamado_exibicao}"
             
-            # Divide o espaço: 75% para o Expander (esquerda) e 25% para a Última Atualização (direita)
             col_expander, col_atualizacao = st.columns([3, 1])
             
             with col_atualizacao:
@@ -214,6 +231,46 @@ with aba_analise:
                     data_obs_exibicao = evento.get('data_observacao', 'Não informada (Registro Antigo)')
                     st.caption(f"Criado por **{evento['criador']}** em {evento['data_criacao']} | 📅 Observado em: **{data_obs_exibicao}**")
                     
+                    st.markdown("---")
+                    st.markdown("📖 **Histórico de Atualizações:**")
+                    historico = evento.get("historico_atualizacoes", [])
+                    
+                    if not historico and evento.get("ultima_atualizacao"):
+                        st.markdown(f"- 📅 *Legado* | 👤 *Sistema*: {evento['ultima_atualizacao']}")
+                    elif not historico:
+                        st.markdown("*Nenhuma atualização registrada.*")
+                    else:
+                        for h in historico:
+                            st.markdown(f"- 📅 **{h['data']}** | 👤 **{h['autor']}**: {h['texto']}")
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown("📝 **Adicionar Nova Atualização:**")
+                    c_upd1, c_upd2 = st.columns([8, 2])
+                    novo_texto_upd = c_upd1.text_input("Nova Atualização", key=f"new_upd_{evento['id']}", label_visibility="collapsed", placeholder="Digite a nova atualização...")
+                    if c_upd2.button("➕ Adicionar", key=f"btn_add_upd_{evento['id']}", use_container_width=True):
+                        if novo_texto_upd.strip():
+                            if "historico_atualizacoes" not in evento:
+                                evento["historico_atualizacoes"] = []
+                                if evento.get("ultima_atualizacao"):
+                                    evento["historico_atualizacoes"].append({
+                                        "data": evento.get("data_criacao", "Legado"), 
+                                        "autor": evento.get("criador", "Sistema"), 
+                                        "texto": evento["ultima_atualizacao"]
+                                    })
+                            
+                            evento["historico_atualizacoes"].append({
+                                "data": datetime.datetime.now().strftime("%d/%m/%Y %H:%M"),
+                                "autor": usuario_atual,
+                                "texto": novo_texto_upd.strip()
+                            })
+                            evento["ultima_atualizacao"] = novo_texto_upd.strip()
+                            evento["modificado_por"] = usuario_atual
+                            evento["data_modificacao"] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                            transacao_db("editar", evento)
+                            st.rerun()
+
+                    st.markdown("---")
+                    st.markdown("⚙️ **Editar Dados Básicos do Evento:**")
                     data_obs_atual_str = evento.get("data_observacao", datetime.date.today().strftime("%d/%m/%Y"))
                     try:
                         data_obs_atual_obj = datetime.datetime.strptime(data_obs_atual_str, "%d/%m/%Y").date()
@@ -221,7 +278,6 @@ with aba_analise:
                         data_obs_atual_obj = datetime.date.today()
 
                     t_edit = st.text_input("Título", value=evento["titulo"], key=f"t_{evento['id']}")
-                    u_edit = st.text_input("Última Atualização (Resumo curto)", value=evento.get("ultima_atualizacao", ""), key=f"u_{evento['id']}")
                     
                     c0, c1, c2 = st.columns(3)
                     d_edit = c0.date_input("Data de Observação", value=data_obs_atual_obj, format="DD/MM/YYYY", key=f"d_{evento['id']}")
@@ -229,12 +285,11 @@ with aba_analise:
                     ch_edit = c2.text_input("Número do Chamado", value=evento["chamado"], key=f"ch_{evento['id']}")
                     
                     if evento.get('data_modificacao'):
-                        st.caption(f"Última alteração por **{evento['modificado_por']}** em {evento['data_modificacao']}")
+                        st.caption(f"Última alteração de dados base por **{evento['modificado_por']}** em {evento['data_modificacao']}")
 
                     b1, b2, _ = st.columns([2, 2, 6])
-                    if b1.button("✏️ Salvar Alterações", key=f"salvar_{evento['id']}"):
+                    if b1.button("✏️ Salvar Dados", key=f"salvar_{evento['id']}"):
                         evento["titulo"] = t_edit
-                        evento["ultima_atualizacao"] = u_edit
                         evento["data_observacao"] = d_edit.strftime("%d/%m/%Y")
                         evento["responsavel"] = r_edit
                         evento["chamado"] = ch_edit
@@ -284,9 +339,21 @@ with aba_concluidos:
                 with st.expander(header_conc):
                     st.markdown(f"**📅 Data de Observação:** {evento.get('data_observacao', 'Não informada')}")
                     st.markdown(f"**Responsável:** {evento.get('responsavel', 'Não informado')}")
-                    st.markdown(f"**Última Atualização antes da conclusão:** {evento.get('ultima_atualizacao', 'Não informada')}")
                     st.markdown(f"**Criado por:** {evento['criador']} em {evento['data_criacao']}")
                     st.markdown(f"**Concluído por:** {evento['modificado_por']} em {evento['data_conclusao']}")
+                    
+                    st.markdown("---")
+                    st.markdown("📖 **Histórico de Atualizações:**")
+                    historico = evento.get("historico_atualizacoes", [])
+                    if not historico and evento.get("ultima_atualizacao"):
+                        st.markdown(f"- 📅 *Legado* | 👤 *Sistema*: {evento['ultima_atualizacao']}")
+                    elif not historico:
+                        st.markdown("*Nenhuma atualização registrada.*")
+                    else:
+                        for h in historico:
+                            st.markdown(f"- 📅 **{h['data']}** | 👤 **{h['autor']}**: {h['texto']}")
+                    
+                    st.markdown("---")
                     st.markdown("**Solução Aplicada:**")
                     st.success(evento["conclusao"])
                     
