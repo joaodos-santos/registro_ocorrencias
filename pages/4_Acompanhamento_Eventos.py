@@ -34,7 +34,6 @@ if st.session_state.get("perfil_autorizado") != "Acompanhamento":
 DB_PATH = "/tiop/dados-containers/tvtop/banco_acompanhamento.json"
 
 def carregar_db():
-    """Apenas lê o banco de dados para montar a tela inicial."""
     if not os.path.exists(DB_PATH):
         return []
     with open(DB_PATH, "r") as f:
@@ -44,10 +43,6 @@ def carregar_db():
             return []
 
 def transacao_db(acao, dados):
-    """
-    Garante concorrência travando o arquivo no nível do Sistema Operacional.
-    Lê a versão mais atual no exato milissegundo do clique, aplica a mudança e destrava.
-    """
     if not os.path.exists(DB_PATH):
         with open(DB_PATH, "w") as f:
             json.dump([], f)
@@ -63,13 +58,11 @@ def transacao_db(acao, dados):
 
             if acao == "inserir":
                 banco_atual.append(dados)
-            
             elif acao == "editar":
                 for i, evt in enumerate(banco_atual):
                     if evt["id"] == dados["id"]:
                         banco_atual[i] = dados
                         break
-                        
             elif acao == "excluir":
                 banco_atual = [e for e in banco_atual if e["id"] != dados]
 
@@ -102,12 +95,12 @@ db_ordenado = sorted(db, key=obter_chave_ordenacao)
 mapa_numeracao = {evento["id"]: index + 1 for index, evento in enumerate(db_ordenado)}
 
 def exportar_csv(banco_dados):
-    """Filtra os campos e prepara o binário do CSV para download."""
     colunas_map = {
         "titulo": "Título da Ocorrência",
         "data_observacao": "Data da Ocorrência",
         "responsavel": "Responsável",
         "chamado": "Número do Chamado",
+        "versao_2_11_texto": "Versão 2.11.1.22 - HF2",
         "ultima_atualizacao": "Última Atualização",
         "todas_atualizacoes": "Todas as Atualizações"
     }
@@ -121,6 +114,8 @@ def exportar_csv(banco_dados):
             e_copy["ultima_atualizacao"] = hist[-1]["texto"]
         else:
             e_copy["todas_atualizacoes"] = e.get("ultima_atualizacao", "")
+            
+        e_copy["versao_2_11_texto"] = "Sim" if e.get("versao_2_11", False) else "Não"
         db_export.append(e_copy)
     
     if not db_export:
@@ -168,6 +163,8 @@ with st.expander("➕ **ABRIR NOVO CHAMADO / EVENTO**", expanded=False):
         data_obs_novo = c_obs.date_input("Data de Observação do Evento *", format="DD/MM/YYYY")
         resp_novo = col1.text_input("Responsável pela avaliação (Opcional)")
         chamado_novo = col2.text_input("Número do chamado (Opcional)")
+        
+        versao_novo = st.checkbox("🔵 Marcar como Versão 2.11.1.22 - HF2")
 
         submitted = st.form_submit_button("💾 Criar Registro", type="primary")
         if submitted:
@@ -189,6 +186,7 @@ with st.expander("➕ **ABRIR NOVO CHAMADO / EVENTO**", expanded=False):
                     "data_observacao": data_obs_novo.strftime("%d/%m/%Y"),
                     "responsavel": resp_novo.strip(),
                     "chamado": chamado_novo.strip(),
+                    "versao_2_11": versao_novo,
                     "ultima_atualizacao": ultima_atualizacao_novo.strip(),
                     "historico_atualizacoes": historico_inicial,
                     "criador": usuario_atual,
@@ -218,8 +216,9 @@ with aba_analise:
             num_evento = mapa_numeracao[evento['id']]
             resp_exibicao = evento.get('responsavel') if evento.get('responsavel') else 'Não informado'
             chamado_exibicao = evento.get('chamado') if evento.get('chamado') else 'N/A'
+            tag_versao = " 🔵 [2.11.1.22 - HF2]" if evento.get("versao_2_11", False) else ""
             
-            header = f"#{num_evento:02d} - ❓ {evento['titulo']} | Resp: {resp_exibicao} | Chamado: {chamado_exibicao}"
+            header = f"#{num_evento:02d} - ❓ {evento['titulo']}{tag_versao} | Resp: {resp_exibicao} | Chamado: {chamado_exibicao}"
             
             col_expander, col_atualizacao = st.columns([3, 1])
             
@@ -228,6 +227,9 @@ with aba_analise:
 
             with col_expander:
                 with st.expander(header):
+                    if evento.get("versao_2_11", False):
+                        st.info("🔵 **Este evento está marcado para a Versão 2.11.1.22 - HF2**")
+                        
                     data_obs_exibicao = evento.get('data_observacao', 'Não informada (Registro Antigo)')
                     st.caption(f"Criado por **{evento['criador']}** em {evento['data_criacao']} | 📅 Observado em: **{data_obs_exibicao}**")
                     
@@ -278,6 +280,7 @@ with aba_analise:
                         data_obs_atual_obj = datetime.date.today()
 
                     t_edit = st.text_input("Título", value=evento["titulo"], key=f"t_{evento['id']}")
+                    v_edit = st.checkbox("🔵 Marcar como Versão 2.11.1.22 - HF2", value=evento.get("versao_2_11", False), key=f"v_{evento['id']}")
                     
                     c0, c1, c2 = st.columns(3)
                     d_edit = c0.date_input("Data de Observação", value=data_obs_atual_obj, format="DD/MM/YYYY", key=f"d_{evento['id']}")
@@ -290,6 +293,7 @@ with aba_analise:
                     b1, b2, _ = st.columns([2, 2, 6])
                     if b1.button("✏️ Salvar Dados", key=f"salvar_{evento['id']}"):
                         evento["titulo"] = t_edit
+                        evento["versao_2_11"] = v_edit
                         evento["data_observacao"] = d_edit.strftime("%d/%m/%Y")
                         evento["responsavel"] = r_edit
                         evento["chamado"] = ch_edit
@@ -327,8 +331,9 @@ with aba_concluidos:
             num_evento = mapa_numeracao[evento['id']]
             resp_exibicao = evento.get('responsavel') if evento.get('responsavel') else 'Não informado'
             chamado_exibicao = evento.get('chamado') if evento.get('chamado') else 'N/A'
+            tag_versao = " 🔵 [2.11.1.22 - HF2]" if evento.get("versao_2_11", False) else ""
             
-            header_conc = f"#{num_evento:02d} - ✅ {evento['titulo']} | Resp: {resp_exibicao} | Chamado: {chamado_exibicao}"
+            header_conc = f"#{num_evento:02d} - ✅ {evento['titulo']}{tag_versao} | Resp: {resp_exibicao} | Chamado: {chamado_exibicao}"
             
             col_expander_conc, col_atualizacao_conc = st.columns([3, 1])
             
@@ -337,6 +342,9 @@ with aba_concluidos:
             
             with col_expander_conc:
                 with st.expander(header_conc):
+                    if evento.get("versao_2_11", False):
+                        st.info("🔵 **Este evento esteve marcado para a Versão 2.11.1.22 - HF2**")
+                        
                     st.markdown(f"**📅 Data de Observação:** {evento.get('data_observacao', 'Não informada')}")
                     st.markdown(f"**Responsável:** {evento.get('responsavel', 'Não informado')}")
                     st.markdown(f"**Criado por:** {evento['criador']} em {evento['data_criacao']}")
